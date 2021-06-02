@@ -1,0 +1,429 @@
+<script src="./script/createjs.min.js"></script>
+<script src="flappy_slime.js"></script>
+<script src="./script/ndgmr.Collision.js"></script>
+<script>
+    let canvas, stage, exportRoot, anim_container, dom_overlay_container, fnStartAnimation;
+
+    function init() {
+        canvas = document.getElementById("canvas");
+        anim_container = document.getElementById("animation_container");
+        dom_overlay_container = document.getElementById("dom_overlay_container");
+        let comp = AdobeAn.getComposition("1CD63061EE452A43B88CE02F08B23BB6");
+        let loader = new createjs.LoadQueue(false);
+        loader.addEventListener("fileload", function (evt) {
+            handleFileLoad(evt, comp);
+        });
+        loader.addEventListener("complete", function (evt) {
+            createjs.Sound.addEventListener("allsoundsloaded", () => {
+                handleComplete(evt, comp);
+                document.getElementById("loading").remove();
+            });
+        });
+        let lib = comp.getLibrary();
+        loader.loadManifest(lib.properties.manifest);
+    }
+
+    function handleFileLoad(evt, comp) {
+        let images = comp.getImages();
+        if (evt && (evt.item.type === "image")) {
+            images[evt.item.id] = evt.result;
+        }
+    }
+
+    let bgmCounts = 6;
+    let jumpSndCounts = 4;
+    let totalCounts = 11;
+    let loadedEvt = 0;
+    let bgm1 = {}, bgm2 = {}, bgm3 = {}, bgm4 = {}, bgm5 = {}, bgm6 = {};
+    let jump1 = {}, jump2 = {}, jump3 = {}, jump4 = {}, died = {};
+
+    createjs.Sound.alternateExtensions = ["mp3"];
+    createjs.Sound.registerSounds([
+        {src: "./sounds/Blocks.mp3", id: "bgm1"},
+        {src: "./sounds/Cat.mp3", id: "bgm2"},
+        {src: "./sounds/Dog.mp3", id: "bgm3"},
+        {src: "./sounds/Far.mp3", id: "bgm4"},
+        {src: "./sounds/Mall.mp3", id: "bgm5"},
+        {src: "./sounds/Blocks.mp3", id: "bgm6"},
+        {src: "./sounds/oof.mp3", id: "died"},
+        {src: "./sounds/slime_jump1.mp3", id: "jump1"},
+        {src: "./sounds/slime_jump2.mp3", id: "jump2"},
+        {src: "./sounds/slime_jump3.mp3", id: "jump3"},
+        {src: "./sounds/slime_jump4.mp3", id: "jump4"},
+    ]);
+
+    createjs.Sound.on("fileload", () => {
+        loadedEvt++;
+        let progress = document.getElementById("progress");
+        if (progress !== null) {
+            progress.style.width = (200 * ((loadedEvt + 5) / totalCounts)).toString() + "px";
+        }
+        if (loadedEvt === bgmCounts + jumpSndCounts) {
+            createjs.Sound.dispatchEvent(new Event("allsoundsloaded"));
+        }
+    });
+
+    function handleComplete(evt, comp) {
+        let lib = comp.getLibrary();
+        let ss = comp.getSpriteSheet();
+        let queue = evt.target;
+        let ssMetadata = lib.ssMetadata;
+        for (let i = 0; i < ssMetadata.length; i++) {
+            ss[ssMetadata[i].name] = new createjs.SpriteSheet({
+                "images": [queue.getResult(ssMetadata[i].name)],
+                "frames": ssMetadata[i].frames
+            })
+        }
+        exportRoot = new lib.flappy_slime();
+        stage = new lib.Stage(canvas);
+        stage.enableMouseOver();
+
+        let bestScore = 0;
+
+        let slime = exportRoot.slime;
+        slime.strength = 300;
+        stage.gravity = 6;
+
+        let pipes = [];
+        const pInterval = 160;
+        const maxPipes = 3;
+
+        let endGame = new lib.endGame();
+        endGame.x = 144;
+        endGame.y = 256;
+        stage.addChild(endGame);
+        let help = exportRoot.help;
+        let title = exportRoot.title;
+        let bg = exportRoot.bg;
+
+        let sndEnabled = exportRoot.snd_e;
+        let sndDisabled = exportRoot.snd_d;
+        sndEnabled.visible = true;
+        sndDisabled.visible = false;
+        let soundController = {
+            allMuted: false,
+            currentBgm: {},
+            randomJump: function () {
+                if (!this.allMuted) {
+                    let rd = (1 + Math.random() * (jumpSndCounts - 1)).toFixed();
+                    switch (rd) {
+                        case '1':
+                            jump1.s = createjs.Sound.play("jump1");
+                            jump1.s.volume = 0.6;
+                            break;
+                        case '2':
+                            jump2.s = createjs.Sound.play("jump2");
+                            jump2.s.volume = 0.6;
+                            break;
+                        case '3':
+                            jump3.s = createjs.Sound.play("jump3");
+                            jump3.s.volume = 0.6;
+                            break;
+                        case '4':
+                            jump4.s = createjs.Sound.play("jump4");
+                            jump4.s.volume = 0.6;
+                            break;
+                    }
+                }
+            },
+            resetBgm: function () {
+                let rd = (1 + Math.random() * (bgmCounts - 1)).toFixed();
+                let sndV = 0.4;
+                switch (rd) {
+                    case '1':
+                        bgm1.s = createjs.Sound.play("bgm1");
+                        bgm1.s.volume = sndV;
+                        this.currentBgm = bgm1.s;
+                        break;
+                    case '2':
+                        bgm2.s = createjs.Sound.play("bgm2");
+                        bgm2.s.volume = sndV;
+                        this.currentBgm = bgm2.s;
+                        break;
+                    case '3':
+                        bgm3.s = createjs.Sound.play("bgm3");
+                        bgm3.s.volume = sndV;
+                        this.currentBgm = bgm3.s;
+                        break;
+                    case '4':
+                        bgm4.s = createjs.Sound.play("bgm4");
+                        bgm4.s.volume = sndV;
+                        this.currentBgm = bgm4.s;
+                        break;
+                    case '5':
+                        bgm5.s = createjs.Sound.play("bgm5");
+                        bgm5.s.volume = sndV;
+                        this.currentBgm = bgm5.s;
+                        break;
+                    case '6':
+                        bgm6.s = createjs.Sound.play("bgm6");
+                        bgm6.s.volume = sndV;
+                        this.currentBgm = bgm6.s;
+                        break;
+                }
+                soundController.currentBgm.addEventListener("complete", () => {
+                    soundController.changeBgm();
+                });
+            },
+            changeBgm: function () {
+                if (!this.allMuted) {
+                    this.resetBgm();
+                }
+            },
+            diedEffect: function () {
+                if (!this.allMuted) {
+                    died.s = createjs.Sound.play("died");
+                    died.s.volume = 0.6;
+                }
+            },
+            sndStart: function () {
+                this.resetBgm();
+                sndEnabled.visible = true;
+                sndDisabled.visible = false;
+                this.allMuted = false;
+            },
+            sndStop: function () {
+                sndDisabled.visible = true;
+                sndEnabled.visible = false;
+                this.allMuted = true;
+                if (this.currentBgm) {
+                    this.currentBgm.stop();
+                }
+            }
+        }
+        sndEnabled.addEventListener("click", () => {
+            soundController.sndStop();
+        });
+        sndDisabled.addEventListener("click", () => {
+            soundController.sndStart();
+        });
+        soundController.sndStart();
+
+
+        let score = 0;
+        let scoreText = exportRoot.score;
+        scoreText.visible = false;
+        let scoreBoard = endGame.scoreBoard;
+
+        let initPos = {};
+        initPos.x = slime.x;
+        initPos.y = slime.y;
+
+        let keymap = {
+            start: " ",
+            jump: " ",
+            goodByeCruelWorld: "\\",
+        }
+
+        let medalLevel = {
+            level0: 0,
+            level1: 30,
+            level2: 80,
+            level3: 180
+        }
+
+        // let levels = { baby: 0.8, normal: 1.0, hardCore: 1.2, niceTry: 1.6}
+        // let difficulty = levels.normal;
+
+        class Pipe {
+            ins;
+            #sL;
+            #sB;
+            #startX;
+            #startY;
+
+            constructor() {
+                this.#sL = stage.canvas.clientWidth;
+                this.#sB = stage.canvas.clientHeight;
+                this.#startX = stage.canvas.clientWidth + 30;
+                this.#startY = 100;
+
+                if (Math.random() > 0.5) {
+                    this.#createPipeUp();
+                } else {
+                    this.#createPipeDown();
+                }
+                this.ins.x = this.#startX;
+                stage.addChild(this.ins);
+            }
+
+            static #randomPos(min, max) {
+                return min + Math.random() * max;
+            }
+
+            #getUpY(ph) {
+                return Pipe.#randomPos(this.#sB - ph, this.#sB - this.#startY);
+            }
+
+            #getDownY(ph) {
+                return -Pipe.#randomPos(0, ph - this.#startY);
+            }
+
+            #createPipeUp() {
+                this.ins = new lib.pipeUp();
+                this.ins.y = this.#getUpY(this.ins.nominalBounds.height);
+            }
+
+            #createPipeDown() {
+                this.ins = new lib.pipeDown();
+                this.ins.y = this.#getDownY(this.ins.nominalBounds.height);
+            }
+        }
+
+        let gameInit = () => {
+            bg.play();
+            help.visible = true;
+            title.visible = true;
+            endGame.visible = false;
+            slime.gotoAndPlay(0);
+            slime.x = initPos.x;
+            slime.y = initPos.y;
+            scoreText.visible = false;
+
+            for (let i = 0; i < maxPipes; i++) {
+                if (pipes[i] !== undefined) {
+                    stage.removeChild(pipes[i].ins);
+                }
+            }
+            pipes.splice(0, pipes.length);
+
+            window.addEventListener("keypress", gameStart);
+            exportRoot.bg.addEventListener("click", gameStart);
+            if (!soundController.allMuted) {
+                sndEnabled.visible = true;
+                sndDisabled.visible = false;
+            } else {
+                sndEnabled.visible = false;
+                sndDisabled.visible = true;
+            }
+        }
+
+        let gameStart = (ev) => {
+            if (ev.key === keymap.start || ev.key === undefined) {
+                slime.gotoAndPlay("jump");
+                soundController.randomJump();
+                createjs.Tween.get(slime).to({y: slime.y - slime.strength}, 400).call(() => {
+                });
+
+                for (let i = 0; i < maxPipes; i++) {
+                    pipes.unshift(new Pipe());
+                    createjs.Tween.get(pipes[0].ins).to({x: pipes[0].ins.x + (pipes[0].ins.nominalBounds.width + pInterval) * i});
+                }
+
+                scoreText.visible = true;
+                help.visible = false;
+                title.visible = false;
+                sndEnabled.visible = false;
+                sndDisabled.visible = false;
+                score = 0;
+                scoreText.text = "0";
+                window.addEventListener("keypress", jumpFn);
+                stage.addEventListener("click", jumpFn);
+                exportRoot.bg.removeEventListener("click", gameStart);
+                window.removeEventListener("keypress", gameStart);
+                window.removeEventListener("keypress", gameInit);
+                createjs.Ticker.addEventListener("tick", gamePlaying);
+                window.addEventListener("keypress", suicide);
+            }
+        }
+
+        let gamePlaying = () => {
+            createjs.Tween.get(slime).to({y: slime.y + stage.gravity});
+
+            if (slime.y - 80 > stage.canvas.clientHeight || slime.y + 80 < 0) {
+                gameOver();
+            }
+
+            for (let i = 0; i < maxPipes; i++) {
+                createjs.Tween.get(pipes[i].ins).to({x: pipes[i].ins.x - 5});
+                let hit = ndgmr.checkRectCollision(slime, pipes[i].ins);
+                if (hit) {
+                    gameOver();
+                }
+            }
+
+            if (pipes[maxPipes - 1].ins.x + pipes[maxPipes - 1].ins.nominalBounds.width < 0) {
+                pipes.pop();
+                pipes.unshift(new Pipe());
+                createjs.Tween.get(pipes[0].ins).to({x: pipes[0].ins.x + pInterval});
+                scoreText.text = (++score).toString();
+            }
+        }
+
+        let showScore = () => {
+            bestScore = score > bestScore ? score : bestScore;
+            scoreBoard.score.text = score;
+            scoreBoard.best.text = bestScore;
+
+            if (score < medalLevel.level1) {
+                scoreBoard.medals.gotoAndStop(0);
+            } else if (score < medalLevel.level2) {
+                scoreBoard.medals.gotoAndStop(1);
+            } else if (score < medalLevel.level3) {
+                scoreBoard.medals.gotoAndStop(2);
+            } else {
+                scoreBoard.medals.gotoAndStop(3);
+            }
+        }
+
+        let gameOver = () => {
+            stage.swapChildren(endGame, stage.getChildAt(stage.numChildren - 1));
+            showScore();
+            bg.stop();
+            slime.gotoAndPlay("fall");
+            endGame.visible = true;
+            endGame.gotoAndPlay(1);
+            scoreText.visible = false;
+            window.removeEventListener("keypress", jumpFn);
+            stage.removeEventListener("click", jumpFn);
+            createjs.Ticker.removeEventListener("tick", gamePlaying);
+            setTimeout(() => {
+                window.addEventListener("keypress", gameInit);
+            }, 1800);
+            window.removeEventListener("keypress", suicide);
+            soundController.diedEffect();
+        }
+
+        let jumpFn = (ev) => {
+            if (ev.key === keymap.jump || ev.key === undefined) {
+                slime.gotoAndPlay("jump");
+                soundController.randomJump();
+                createjs.Tween.get(slime).to({y: slime.y - slime.strength}, 200);
+            }
+        }
+
+        let suicide = ev => {
+            if (ev.key === keymap.goodByeCruelWorld) {
+                gameOver();
+            }
+        }
+
+        endGame.visible = false;
+        endGame.playAgain.addEventListener("click", gameInit);
+        gameInit();
+
+        window.addEventListener("keypress", ev => {
+            if (ev.key === "1") {
+                score = medalLevel.level0;
+            }
+            if (ev.key === "2") {
+                score = medalLevel.level1;
+            }
+            if (ev.key === "3") {
+                score = medalLevel.level2;
+            }
+            if (ev.key === "4") {
+                score = medalLevel.level3;
+            }
+        });
+
+        fnStartAnimation = function () {
+            stage.addChild(exportRoot);
+            createjs.Ticker.framerate = lib.properties.fps;
+            createjs.Ticker.addEventListener("tick", stage);
+        }
+        AdobeAn.makeResponsive(true, 'both', false, 1, [canvas, anim_container, dom_overlay_container]);
+        AdobeAn.compositionLoaded(lib.properties.id);
+        fnStartAnimation();
+    }
+</script>
