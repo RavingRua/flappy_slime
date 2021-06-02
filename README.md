@@ -7,6 +7,7 @@ Ouchdex / Raving / Steven
 ## Github
 
 [RavingRua](https://github.com/RavingRua)
+[Flappy Slime](https://github.com/RavingRua/flappy_slime)
 
 ## Special Thanks
 
