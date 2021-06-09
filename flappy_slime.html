@@ -359,6 +359,27 @@
                 }
             }
 
+            let difficultyController = {
+                levels: {
+                    baby: 0.8,
+                    normal: 1.0,
+                    hardCore: 1.2,
+                    niceTry: 1.6
+                },
+                difficulty: 1,
+                pipeSpeed: 5,
+                acceleration: 0.0000001,
+                increasing: function () {
+                    this.pipeSpeed += this.difficulty * this.acceleration;
+                },
+                reset: function () {
+                    this.difficulty = 1;
+                    this.pipeSpeed = 5;
+                }
+            }
+
+            let increasing = difficultyController.increasing.bind(difficultyController);
+
             let gameInit = () => {
                 bg.play();
                 help.visible = true;
@@ -415,27 +436,6 @@
                     window.addEventListener("keypress", suicide);
                 }
             }
-
-            let difficultyController = {
-                levels: {
-                    baby: 0.8,
-                    normal: 1.0,
-                    hardCore: 1.2,
-                    niceTry: 1.6
-                },
-                difficulty: 1,
-                pipeSpeed: 5,
-                acceleration: 0.0000001,
-                increasing: function () {
-                    this.pipeSpeed += this.difficulty * this.acceleration;
-                },
-                reset: function () {
-                    this.difficulty = 1;
-                    this.pipeSpeed = 5;
-                }
-            }
-
-            let increasing = difficultyController.increasing.bind(difficultyController);
 
             let gamePlaying = () => {
                 createjs.Tween.get(slime).to({y: slime.y + stage.gravity});
