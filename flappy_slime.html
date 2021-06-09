@@ -177,7 +177,7 @@
             stage.gravity = 6;
 
             let pipes = [];
-            const pInterval = 160;
+            let pInterval = 160;
             const maxPipes = 3;
 
             let endGame = new lib.endGame();
@@ -314,9 +314,6 @@
                 level3: 180
             }
 
-            // let levels = { baby: 0.8, normal: 1.0, hardCore: 1.2, niceTry: 1.6}
-            // let difficulty = levels.normal;
-
             class Pipe {
                 ins;
                 #sL;
@@ -419,15 +416,37 @@
                 }
             }
 
+            let difficultyController = {
+                levels: {
+                    baby: 0.8,
+                    normal: 1.0,
+                    hardCore: 1.2,
+                    niceTry: 1.6
+                },
+                difficulty: 1,
+                pipeSpeed: 5,
+                acceleration: 0.0000001,
+                increasing: function () {
+                    this.pipeSpeed += this.difficulty * this.acceleration;
+                },
+                reset: function () {
+                    this.difficulty = 1;
+                    this.pipeSpeed = 5;
+                }
+            }
+
+            let increasing = difficultyController.increasing.bind(difficultyController);
+
             let gamePlaying = () => {
                 createjs.Tween.get(slime).to({y: slime.y + stage.gravity});
+                createjs.Ticker.addEventListener("tick", increasing);
 
                 if (slime.y - 80 > stage.canvas.clientHeight || slime.y + 80 < 0) {
                     gameOver();
                 }
 
                 for (let i = 0; i < maxPipes; i++) {
-                    createjs.Tween.get(pipes[i].ins).to({x: pipes[i].ins.x - 5});
+                    createjs.Tween.get(pipes[i].ins).to({x: pipes[i].ins.x - difficultyController.pipeSpeed});
                     let hit = ndgmr.checkRectCollision(slime, pipes[i].ins);
                     if (hit) {
                         gameOver();
@@ -474,6 +493,8 @@
                 }, 1800);
                 window.removeEventListener("keypress", suicide);
                 soundController.diedEffect();
+                createjs.Ticker.removeEventListener("tick", increasing);
+                difficultyController.reset();
             }
 
             let jumpFn = (ev) => {
